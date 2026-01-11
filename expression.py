@@ -18,7 +18,7 @@ OPERATORS = {
 }
 
 VARIABLES = ['x']
-CONSTANT = ['pi', 'e', 'C']
+CONSTANT = ['C']
 
 
 class Constant(sp.Symbol):
@@ -31,17 +31,7 @@ class ExpressionGenerator:
         self.leaf_prob = leaf_prob
 
     def smart_clean(self, expr):
-        keep_tokens = {sp.E, sp.pi}
-        def transform(node):
-            if not node.is_constant():
-                return node
-            has_token = any(node.has(token) for token in keep_tokens)
-            if not has_token:
-                return node.evalf()
-            if node.is_Function:
-                return node.evalf()
-            return node
-        
+        expr = expr.evalf()
         def replace_trivial_floats(node):
             if node.is_Float:
                 if node == 1.0:
@@ -51,9 +41,7 @@ class ExpressionGenerator:
                 if node == 0.0:
                     return sp.Integer(0)
             return node
-        
-        new_expr = expr.replace(lambda x: x.is_constant(), transform)
-        return new_expr.replace(lambda x: x.is_Float, replace_trivial_floats)
+        return expr.replace(lambda x: x.is_Float, replace_trivial_floats)
     
     def generate_expr(self, depth=None):
         if depth is None:
@@ -86,7 +74,8 @@ class ExpressionGenerator:
         if arity == 2:
             if op_name == 'IntPow':
                 first_arg = self.generate_recursive(depth - 1)
-                second_arg = sp.Integer(random.randint(-4, 4))
+                exponents = [-4, -3, -2, -1, 2, 3, 4]
+                second_arg = sp.Integer(random.choice(exponents))
                 args = (first_arg, second_arg)
                 return symbol(*args)
             first_arg = self.generate_recursive(depth - 1)
@@ -105,10 +94,6 @@ class ExpressionGenerator:
             if c_type == 'C':
                 val = round(random.uniform(-5, 5), 2)
                 return sp.Float(val)
-            if c_type == 'pi':
-                return sp.pi
-            if c_type == 'e':
-                return sp.E
         else:
             var = random.choice(VARIABLES)
             return sp.Symbol(var, real=True)

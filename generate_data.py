@@ -14,22 +14,22 @@ class Tokenizer:
             '<PAD>': 0, '<SOS>': 1, '<EOS>' : 2,
             'Add': 3, 'Mul': 4, 'Pow': 5,
             'sin': 6, 'cos': 7, 'exp': 8, 'log': 9, 'sqrt': 10, 'Abs': 11,
-            'x': 12, 'pi': 13, 'E': 14, 'CONST': 15
+            'x': 12, 'CONST': 13
         }
 
     def expr_to_token_seq(self, expr):
-        pass
+        pass #TODO
 
     def token_seq_to_expr(self, tokens):
-        pass
+        pass #TODO
 
     
 
 class DataGenerator:
-    def __init__(self, max_depth: int, step: float, const_prob: float, leaf_prob: float,
+    def __init__(self, max_depth: int, steps: int, const_prob: float, leaf_prob: float,
                  min_x: float, max_x: float, min_y: float, max_y: float) -> None:
         self.max_depth = max_depth
-        self.step = step
+        self.steps = steps
         self.const_prob = const_prob
         self.generator = ExpressionGenerator(max_depth, const_prob, leaf_prob)
         self.min_x = min_x
@@ -38,9 +38,8 @@ class DataGenerator:
         self.max_y = max_y
 
     def generate_points(self, expr):
-        steps = int((self.max_x - self.min_x) / self.step)
         f = sp.lambdify(sp.Symbol('x'), expr, modules='numpy')
-        x_values = np.linspace(num=steps, start=self.min_x, stop = self.max_x)
+        x_values = np.linspace(num=self.steps, start=self.min_x, stop = self.max_x)
         try:
             y_values = f(x_values)
             if np.isscalar(y_values) or np.ndim(y_values) == 0:
@@ -52,26 +51,25 @@ class DataGenerator:
         mask = np.isfinite(y_values) & (y_values < self.max_y) & (y_values > self.min_y)
         if np.sum(mask) / np.size(mask) <= 0.3:
             return None
-        valid_y = y_values[mask]
-        dy = np.diff(valid_y)
-        mean_change = np.mean(np.abs(dy))
+        dy = np.diff(y_values)
+        diff_mask = mask[:-1] & mask[1:]
+        if np.sum(diff_mask) < 2:
+            return None
+        valid_dy = dy[diff_mask]
+        mean_change = np.mean(np.abs(valid_dy))
         if mean_change > 0.5:
             return None
-        sign_changes = np.sum(np.diff(np.sign(dy)) != 0)
-        if sign_changes > len(valid_y) * 0.3:
+        sign_changes = np.sum(np.diff(np.sign(valid_dy)) != 0)
+        if sign_changes > len(valid_dy) * 0.3:
             return None
         y_values[~mask] = 0.0
         return np.vstack((x_values, y_values, mask.astype(float))).T
-        
-    
-    def expr_to_tokens_id(self, expr):
-        pass #TODO
 
     def generate_data(self):
-        pass
+        pass #TODO
 
 
-data_gen  = DataGenerator(max_depth=4, step=0.02, const_prob=0.1, leaf_prob=0.2, min_x=-10, max_x=10, min_y=-10, max_y=10)
+data_gen  = DataGenerator(max_depth=4, steps = 1000, const_prob=0.1, leaf_prob=0.2, min_x=-10, max_x=10, min_y=-10, max_y=10)
 exprs = set()
 attempts = 0
 start = time.time()
