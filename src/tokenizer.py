@@ -70,64 +70,13 @@ class Tokenizer:
             ("5", sp.Integer(5)),
         ]
 
-        self.token_map = {
-            "<pad>": 0,
-            "<sos>": 1,
-            "<eos>": 2,
-            "x": 3,
-            "C": 4,
-            "Add": 5,
-            "asin": 6,
-            "cos": 7,
-            "exp": 8,
-            "log": 9,
-            "Mul": 10,
-            "Pow": 11,
-            "sin": 12,
-            "sqrt": 13,
-            "tan": 14,
-            "Abs": 15,
-            "-5": 16,
-            "-4": 17,
-            "-3": 18,
-            "-2": 19,
-            "-1": 20,
-            "1": 21,
-            "2": 22,
-            "3": 23,
-            "4": 24,
-            "5": 25,
-        }
+        self.token_map = {name: idx for idx, (name, _) in enumerate(self.tokens)}
 
-        self.id_to_str = {value: key for key, value in self.token_map.items()}
+        self.id_to_str = {idx: name for idx, (name, _) in enumerate(self.tokens)}
 
         self.id_map = [
-            "<pad>",
-            "<sos>",
-            "<eos>",
-            sp.Symbol("x", real=True),
-            sp.Symbol("C", real=True),
-            sp.Add,
-            sp.asin,
-            sp.cos,
-            sp.exp,
-            sp.log,
-            sp.Mul,
-            sp.Pow,
-            sp.sin,
-            sp.sqrt,
-            sp.tan,
-            sp.Abs,
-            sp.Integer(-5),
-            sp.Integer(-4),
-            sp.Integer(-3),
-            sp.Integer(-2),
-            sp.Integer(-1),
-            sp.Integer(1),
-            sp.Integer(2),
-            sp.Integer(3),
-            sp.Integer(4),
-            sp.Integer(5),
+            name if name in ("<pad>", "<sos>", "<eos>") else obj
+            for name, obj in self.tokens
         ]
 
         self.arity_map = {
@@ -245,11 +194,11 @@ class Tokenizer:
 
         raise InvalidExpressionError(start_expr, "не удалось распарсить выражение")
 
-    def expr_to_token_seq(self, expr: sp.Expr) -> npt.NDArray[np.int8]:
+    def expr_to_token_seq(self, expr: sp.Expr) -> npt.NDArray:
         try:
             seq = np.array(self._expr_to_token_seq_recursive(expr, start_expr=expr))
-            start = np.array([self.token_map["<sos>"]], dtype=np.int8)
-            end = np.array([self.token_map["<eos>"]], dtype=np.int8)
+            start = np.array([self.token_map["<sos>"]])
+            end = np.array([self.token_map["<eos>"]])
             return np.concatenate((start, seq, end))
         except TokenizerError:
             raise
@@ -258,7 +207,7 @@ class Tokenizer:
                 f"Внутренняя ошибка при токенизации выражения {expr}"
             ) from e
 
-    def token_seq_to_expr(self, tokens: npt.NDArray[np.int8]) -> sp.Expr:
+    def token_seq_to_expr(self, tokens: npt.NDArray) -> sp.Expr:
         stack = []
 
         for id in tokens[::-1]:
