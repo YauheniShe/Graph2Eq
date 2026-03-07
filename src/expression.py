@@ -1,11 +1,11 @@
-import _thread
 import logging
 import random
-import threading
+import sys
 from contextlib import contextmanager
 
 import numpy as np
 import sympy as sp
+from sympy.core.cache import clear_cache
 
 
 class TimeoutException(Exception):
@@ -14,14 +14,20 @@ class TimeoutException(Exception):
 
 @contextmanager
 def time_limit(seconds):
-    timer = threading.Timer(seconds, _thread.interrupt_main)
-    timer.start()
-    try:
-        yield
-    except KeyboardInterrupt:
-        raise TimeoutException("Timed out!")
-    finally:
-        timer.cancel()
+    # Безопасный таймаут для Unix-подобных систем
+    if sys.platform != "win32":
+        import signal
+
+        def signal_handler(signum, frame):
+            raise TimeoutException("Timed out!")
+
+        old_handler = signal.signal(signal.SIGALRM, signal_handler)
+        signal.alarm(seconds)
+        try:
+            yield
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
 
 
 x = sp.Symbol("x", real=True)
@@ -140,7 +146,7 @@ class ExpressionGenerator:
     def _clean_skeleton(self, expr):
         C_tok = sp.Symbol("C_tok", real=True)
 
-        # 1. Раскрываем скобки
+        # 1. Раскрываем скобки (оставляем как есть, это нужно для нормализации)
         try:
             expr = sp.expand(expr)
         except Exception as e:
@@ -153,36 +159,42 @@ class ExpressionGenerator:
             if isinstance(node, sp.Symbol) and str(node).startswith("C_"):
                 return C_tok
             if isinstance(node, sp.Number):
-                return node  # Базовые числа (2, -1, 1/2) пока сохраняем
+                return node
 
             # Рекурсивно собираем узлы снизу вверх
             args = [_fold(arg) for arg in node.args]
             new_expr = node.func(*args) if args else node
 
-            # ПРАВИЛО 1: В поддереве ВООБЩЕ НЕТ переменной x
-            if not getattr(new_expr, "has", lambda var: False)(x):
-                # Если там уже затесался C_tok (например, C_tok + 2) -> всё съедается в C_tok
-                if getattr(new_expr, "has", lambda var: False)(C_tok):
+            # --- ОПТИМИЗАЦИЯ START ---
+            # Вместо медленного .has(x), получаем кэшированное множество свободных переменных
+            # Это работает за O(1) для уже созданных выражений
+            free_syms = getattr(new_expr, "free_symbols", set())
+
+            # Если x нет в свободных переменных - это константа
+            if x not in free_syms:
+                # Если внутри есть C_tok - сворачиваем всё в C_tok
+                if C_tok in free_syms:
                     return C_tok
-                # Если это чистое структурное число (например 2 или 1/2) -> оставляем
+                # Если это просто число (sp.Number или сложное числовое выражение)
                 if isinstance(new_expr, sp.Number):
                     return new_expr
-                # ВАШ СЛУЧАЙ: всякие tan(4), exp(2) попадают сюда и беспощадно превращаются в C_tok!
+                # Любое другое выражение без x, но с C_tok (или зависящее от других констант)
                 return C_tok
+            # --- ОПТИМИЗАЦИЯ END ---
 
-            # ПРАВИЛО 2: Поддерево содержит x (схлопываем множители и слагаемые)
             if new_expr.is_Mul:
-                has_x = [
-                    a for a in new_expr.args if getattr(a, "has", lambda var: False)(x)
-                ]
-                no_x = [
-                    a
-                    for a in new_expr.args
-                    if not getattr(a, "has", lambda var: False)(x)
-                ]
+                # --- ОПТИМИЗАЦИЯ: используем free_symbols вместо has ---
+                has_x = []
+                no_x = []
+                for a in new_expr.args:
+                    if x in getattr(a, "free_symbols", set()):
+                        has_x.append(a)
+                    else:
+                        no_x.append(a)
 
+                # Проверяем наличие C_tok в части без x через free_symbols
                 if any(
-                    a == C_tok or getattr(a, "has", lambda var: False)(C_tok)
+                    C_tok in getattr(a, "free_symbols", set()) or a == C_tok
                     for a in no_x
                 ):
                     return sp.Mul(C_tok, *has_x)
@@ -191,13 +203,18 @@ class ExpressionGenerator:
             if new_expr.is_Add:
                 has_x = []
                 no_x = []
+                # --- ОПТИМИЗАЦИЯ: используем free_symbols вместо has ---
                 for a in new_expr.args:
-                    if getattr(a, "has", lambda var: False)(x):
+                    if x in getattr(a, "free_symbols", set()):
                         has_x.append(a)
                     else:
                         no_x.append(a)
 
-                if any(getattr(a, "has", lambda var: False)(C_tok) for a in no_x):
+                # Быстрая проверка "поглощения" констант
+                if any(
+                    C_tok in getattr(a, "free_symbols", set()) or a == C_tok
+                    for a in no_x
+                ):
                     collapsed_no_x = C_tok
                 elif no_x:
                     collapsed_no_x = sp.Add(*no_x)
@@ -206,17 +223,20 @@ class ExpressionGenerator:
 
                 x_terms = {}
                 for term in has_x:
+                    # Разбор слагаемых на коэффициент и переменную часть
                     if term.is_Mul:
+                        # --- ОПТИМИЗАЦИЯ: фильтрация через free_symbols ---
                         c_parts = [
                             a
                             for a in term.args
-                            if not getattr(a, "has", lambda var: False)(x)
+                            if x not in getattr(a, "free_symbols", set())
                         ]
                         x_parts = [
                             a
                             for a in term.args
-                            if getattr(a, "has", lambda var: False)(x)
+                            if x in getattr(a, "free_symbols", set())
                         ]
+
                         x_key = sp.Mul(*x_parts)
                         c_key = sp.Mul(*c_parts) if c_parts else sp.Integer(1)
                     else:
@@ -233,7 +253,9 @@ class ExpressionGenerator:
                     res_terms.append(collapsed_no_x)
 
                 for x_key, c_val in x_terms.items():
-                    if getattr(c_val, "has", lambda var: False)(C_tok):
+                    # --- ОПТИМИЗАЦИЯ: проверка коэффициента через free_symbols ---
+                    c_val_free = getattr(c_val, "free_symbols", set())
+                    if C_tok in c_val_free:
                         res_terms.append(C_tok * x_key)
                     else:
                         res_terms.append(c_val * x_key)
@@ -247,6 +269,8 @@ class ExpressionGenerator:
             return new_expr
 
         folded = expr
+        # Цикл while True здесь всё ещё нужен, так как фолдинг может каскадно упрощаться,
+        # но теперь каждый проход будет в разы быстрее.
         while True:
             new_folded = _fold(folded)
             if new_folded == folded:
@@ -347,8 +371,14 @@ class ExpressionGenerator:
         return build_ast()
 
     def generate_expr(self):
+        attempts = 0
         n = random.randint(1, self.max_ops)
         while True:
+            attempts += 1
+
+            if attempts % 100000 == 0:
+                clear_cache()
+
             stage = "INIT"
             expr = None
             try:
