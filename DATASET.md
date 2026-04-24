@@ -1,4 +1,4 @@
-# Датасет Graph2Eq
+# Датасет Plot2Eq
 
 Этот документ описывает датасет, который используется для обучения Point-to-Sequence модели **Graph2Eq**. Датасет сопоставляет двумерные математические графики (представленные в виде нормализованных 1D-последовательностей) с их математическими "скелетами" (формулами с плейсхолдерами `C` вместо констант).
 
@@ -46,8 +46,6 @@ import torch
 from torch.utils.data import DataLoader
 from src.dataset import SymbolicDataset
 
-# 1. Инициализация датасета
-data_dir = "data"
 dataset = SymbolicDataset(data_dir, map_location="cpu")
 print(f"Датасет загружен. Всего примеров: {len(dataset):,}")
 
@@ -60,3 +58,12 @@ for batch_points, batch_tokens in dataloader:
     # batch_tokens shape: [256, 128]
     
     pass
+```
+
+## Загрузка готового датасета (Рекомендуется)
+
+Для тех, кто хочет использовать датасет для обучения модели без необходимости запускать ресурсоемкий пайплайн генерации данных, датасет доступен для скачивания на Kaggle.
+
+**[>> Скачать датасет с Kaggle <<](https://www.kaggle.com/datasets/yauhenisheshukou/plot2eq-dataset)**
+
+Архив содержит все `.pt` чанки и `metadata.csv`, полностью готовые к использованию.
