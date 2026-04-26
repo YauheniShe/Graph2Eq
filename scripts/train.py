@@ -19,6 +19,7 @@ from src.tokenizer import Tokenizer
 @dataclass
 class TrainConfig:
     data_dir: str = "../data"
+    resume_from_checkpoint: str | None = None
 
     batch_size: int = 256
     epochs: int = 1000
@@ -156,10 +157,30 @@ def train_loop(cfg: TrainConfig):
         ignore_index=pad_idx, label_smoothing=cfg.label_smoothing
     )
 
+    start_epoch = 1
     best_val_loss = float("inf")
     Path("checkpoints").mkdir(parents=True, exist_ok=True)
 
-    for epoch in range(1, cfg.epochs + 1):
+    if cfg.resume_from_checkpoint and Path(cfg.resume_from_checkpoint).exists():
+        print(f"Начинаем обучение с чекпоинта: {cfg.resume_from_checkpoint}")
+        checkpoint = torch.load(cfg.resume_from_checkpoint, map_location=cfg.device)
+
+        raw_model = model._orig_mod if hasattr(model, "_orig_mod") else model
+        raw_model.load_state_dict(checkpoint["model_state_dict"])  # type: ignore
+
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+        start_epoch = checkpoint["epoch"] + 1
+        best_val_loss = checkpoint["best_val_loss"]
+
+        print(
+            f"Возобновлено с эпохи {checkpoint['epoch']}. Начинаем следующую эпоху: {start_epoch}"
+        )
+    else:
+        print("Начинаем обучение с нуля.")
+
+    for epoch in range(start_epoch, cfg.epochs + 1):
         model.train()
         train_loss = 0.0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{cfg.epochs} [Train]")
