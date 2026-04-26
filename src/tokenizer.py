@@ -218,7 +218,7 @@ class Tokenizer:
                 f"Внутренняя ошибка при токенизации выражения {expr}"
             ) from e
 
-    def token_seq_to_expr(self, tokens: npt.NDArray) -> sp.Expr:
+    def token_seq_to_expr(self, tokens) -> sp.Expr:
         stack = []
 
         tokens_list = list(tokens)
