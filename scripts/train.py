@@ -20,6 +20,7 @@ from src.tokenizer import Tokenizer
 class TrainConfig:
     data_dir: str = "../data"
     resume_from_checkpoint: str | None = None
+    project_name: str = "Plot2Eq"
 
     batch_size: int = 256
     epochs: int = 1000
@@ -28,13 +29,12 @@ class TrainConfig:
     warmup_ratio: float = 0.05
     max_grad_norm: float = 1.0
 
-    d_model = 512
-    nhead = 8
-    num_enc_layers = 4
-    num_dec_layers = 4
-    dropout = 0.1
-
-    max_seq_len: int = 128
+    d_model: int = 512
+    nhead: int = 8
+    num_enc_layers: int = 4
+    num_dec_layers: int = 4
+    dropout: float = 0.1
+    max_seq_len = 128
     label_smoothing: float = 0.1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,7 +104,7 @@ def create_val_predictions_table(model, points, true_tokens, tokenizer, num_exam
 
 def train_loop(cfg: TrainConfig):
 
-    wandb.init(project="Plot2Eq", config=asdict(cfg))
+    wandb.init(project=cfg.project_name, config=asdict(cfg))
 
     train_loader, val_loader, vocab_size, pad_idx = build_dataloaders(
         data_dir=cfg.data_dir, batch_size=cfg.batch_size
