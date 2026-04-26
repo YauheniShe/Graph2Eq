@@ -1,3 +1,6 @@
+import io
+import tarfile
+import zipfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -152,19 +155,74 @@ class SymbolicDataset(Dataset):
 
         self.points = []
         self.tokens = []
+        self.file_names = []
 
-        if not self.file_names:
-            raise RuntimeError(f"Не найдено ни одного .pt файла в папке {data_dir}")
-
-        print(f"Загружаем {len(self.file_names)} файлов в память")
-
-        for f in tqdm(self.file_names):
-            file_path = self.data_dir / f
-            data = torch.load(
-                file_path, map_location=self.map_location, weights_only=True
+        if self.data_dir.is_dir():
+            self.file_names = sorted(
+                [f.name for f in self.data_dir.iterdir() if f.name.endswith(".pt")]
             )
-            self.points.append(data["points"])
-            self.tokens.append(data["tokens"])
+            if not self.file_names:
+                raise RuntimeError(f"Не найдено ни одного .pt файла в папке {data_dir}")
+
+            print(f"Загружаем {len(self.file_names)} файлов в память (из директории)")
+            for f in tqdm(self.file_names):
+                file_path = self.data_dir / f
+                data = torch.load(
+                    file_path, map_location=self.map_location, weights_only=True
+                )
+                self.points.append(data["points"])
+                self.tokens.append(data["tokens"])
+
+        elif self.data_dir.is_file() and self.data_dir.suffix.lower() == ".zip":
+            with zipfile.ZipFile(self.data_dir, "r") as z:
+                self.file_names = sorted([f for f in z.namelist() if f.endswith(".pt")])
+                if not self.file_names:
+                    raise RuntimeError(
+                        f"Не найдено ни одного .pt файла в архиве {data_dir}"
+                    )
+
+                print(
+                    f"Загружаем {len(self.file_names)} файлов в память (из ZIP-архива)"
+                )
+                for f_name in tqdm(self.file_names):
+                    with z.open(f_name) as f:
+                        buffer = io.BytesIO(f.read())
+                        data = torch.load(
+                            buffer, map_location=self.map_location, weights_only=True
+                        )
+                        self.points.append(data["points"])
+                        self.tokens.append(data["tokens"])
+
+        elif self.data_dir.is_file() and self.data_dir.name.endswith(
+            (".tar", ".tar.gz", ".tgz")
+        ):
+            mode = "r:gz" if self.data_dir.name.endswith(("gz", "tgz")) else "r"
+            with tarfile.open(self.data_dir, mode) as tar:
+                members = [m for m in tar.getmembers() if m.name.endswith(".pt")]
+                members.sort(key=lambda m: m.name)
+                self.file_names = [m.name for m in members]
+
+                if not self.file_names:
+                    raise RuntimeError(
+                        f"Не найдено ни одного .pt файла в архиве {data_dir}"
+                    )
+
+                print(
+                    f"Загружаем {len(self.file_names)} файлов в память (из TAR-архива)"
+                )
+                for member in tqdm(members):
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        buffer = io.BytesIO(f.read())
+                        data = torch.load(
+                            buffer, map_location=self.map_location, weights_only=True
+                        )
+                        self.points.append(data["points"])
+                        self.tokens.append(data["tokens"])
+        else:
+            raise ValueError(
+                f"Путь {self.data_dir} не существует, не является папкой или поддерживаемым архивом!"
+            )
 
         self.points = torch.cat(self.points, dim=0)
         self.tokens = torch.cat(self.tokens, dim=0)
