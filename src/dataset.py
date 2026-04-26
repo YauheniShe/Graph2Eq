@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import sympy as sp
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
@@ -197,9 +198,10 @@ class SymbolicDataset(Dataset):
         clean_tokens = [t.item() for t in tokens if t.item() not in (0, 1, 2)]
         try:
             expr = self.tokenizer.token_seq_to_expr(torch.tensor(clean_tokens))
-            expr_str = str(expr)
+            latex_expr = sp.latex(expr)
+            title_str = f"${latex_expr}$"
         except Exception as e:
-            expr_str = f"Ошибка декодирования: {e}"
+            title_str = f"Ошибка декодирования: {e}"
 
         plt.figure(figsize=(8, 5))
 
@@ -226,7 +228,7 @@ class SymbolicDataset(Dataset):
             label="Линия графика",
         )
 
-        plt.title(f"{title_prefix}Скелет: {expr_str}", fontsize=14, pad=15)
+        plt.title(f"{title_prefix}\n{title_str}", fontsize=16, pad=15)
         plt.xlim(-0.05, 1.05)
         plt.ylim(-0.05, 1.05)
         plt.grid(True, linestyle="--", alpha=0.6)
