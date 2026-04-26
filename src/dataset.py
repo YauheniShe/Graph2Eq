@@ -1,4 +1,5 @@
 import io
+import math
 import tarfile
 import zipfile
 from pathlib import Path
@@ -133,8 +134,8 @@ class SymbolicDataset(Dataset):
     ) -> None:
 
         self.drawn_augmentation = drawn_augmentation
-        self.max_drift_scale = 0.005
-        self.max_wobble_scale = 0.015
+        self.max_drift_scale = max_drift_scale
+        self.max_wobble_scale = max_wobble_scale
         self.p = 0.8
 
         self.transform = HandDrawnAugmentation(max_drift_scale, max_wobble_scale, p)
@@ -142,15 +143,11 @@ class SymbolicDataset(Dataset):
         self.tokenizer = Tokenizer()
 
         self.data_dir = Path(data_dir)
-        self.file_names = sorted(
-            [f.name for f in self.data_dir.iterdir() if f.name.endswith(".pt")]
-        )
-
         self.map_location = map_location
 
         if map_location is None:
             self.map_location = "cuda" if torch.cuda.is_available() else "cpu"
-        elif map_location not in ("cuda", "cpu"):
+        elif not map_location.startswith(("cuda", "cpu")):
             raise ValueError(f"Invalid map_location: {map_location}!")
 
         self.points = []
@@ -301,9 +298,6 @@ class SymbolicDataset(Dataset):
         :param indices: Конкретные индексы для отрисовки (опционально)
         :param apply_transform: Применять ли аугментацию
         """
-        import math
-
-        import matplotlib.pyplot as plt
 
         if indices is None:
             indices = np.random.choice(len(self.points), size=batch_size, replace=False)
