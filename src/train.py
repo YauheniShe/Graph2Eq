@@ -34,7 +34,7 @@ class TrainConfig:
     num_enc_layers: int = 4
     num_dec_layers: int = 4
     dropout: float = 0.1
-    max_seq_len = 128
+    max_seq_len: int = 128
     label_smoothing: float = 0.1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -293,14 +293,17 @@ def train_loop(cfg: TrainConfig):
             }
         )
 
+        raw_model = model._orig_mod if hasattr(model, "_orig_mod") else model
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": raw_model.state_dict(),  # type: ignore
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "best_val_loss": best_val_loss,
+        }
+        torch.save(checkpoint, "checkpoints/last_model.pth")
+
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            raw_model = model._orig_mod if hasattr(model, "_orig_mod") else model
-            checkpoint = {
-                "epoch": epoch,
-                "model_state_dict": raw_model.state_dict(),  # type: ignore
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": scheduler.state_dict(),
-                "best_val_loss": best_val_loss,
-            }
+            checkpoint["best_val_loss"] = best_val_loss
             torch.save(checkpoint, "checkpoints/best_model.pth")
