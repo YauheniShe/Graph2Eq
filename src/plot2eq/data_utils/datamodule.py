@@ -8,8 +8,8 @@ from torch.utils.data import (
 )
 from tqdm.auto import tqdm
 
-from plot2eq.data.augmentation import HandDrawnAugmentation
-from plot2eq.data.dataset import SymbolicDataset
+from plot2eq.data_utils.augmentation import HandDrawnAugmentation
+from plot2eq.data_utils.dataset import SymbolicDataset
 
 
 class AugmentedSubset(Dataset):

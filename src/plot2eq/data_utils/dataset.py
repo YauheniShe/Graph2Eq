@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from plot2eq.core.tokenizer import Tokenizer
-from plot2eq.data.augmentation import HandDrawnAugmentation
+from plot2eq.data_utils.augmentation import HandDrawnAugmentation
 
 
 class SymbolicDataset(Dataset):
