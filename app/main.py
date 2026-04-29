@@ -166,7 +166,7 @@ def evaluate_expr_to_points(expr, x_array):
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html", context={})
 
 
 def _render_worker(formula_str):
