@@ -1,3 +1,12 @@
+---
+title: Plot2Eq
+emoji: 📈
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # Plot2Eq 📈
 
 **Plot2Eq** — это Machine Learning пет-проект, цель которого: распознавание математической формулы по нарисованному от руки графику функции $y = f(x)$.
