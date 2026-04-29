@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 
 from plot2eq.config import TrainConfig
 from plot2eq.core.tokenizer import Tokenizer
-from plot2eq.data.datamodule import build_dataloaders
+from plot2eq.data_utils.datamodule import build_dataloaders
 from plot2eq.models.core_model import Plot2EqModel
 from plot2eq.training.logging_utils import create_val_predictions_table
 
@@ -157,10 +157,6 @@ def train_loop(cfg: TrainConfig):
         with torch.no_grad():
             pbar_val = tqdm(val_loader, desc=f"Epoch {epoch}/{cfg.epochs} [Val]")
 
-            val_table = wandb.Table(
-                columns=["Plot", "True Equation", "Predicted Equation"]
-            )
-
             for batch_idx, (points, tokens) in enumerate(pbar_val):
                 points, tokens = points.to(cfg.device), tokens.to(cfg.device)
 
@@ -195,7 +191,7 @@ def train_loop(cfg: TrainConfig):
                 )
                 total_tokens += mask_flat.sum().item()
 
-                if batch_idx == 0:
+                if batch_idx == 0 and epoch % 10 == 1:
                     val_table = create_val_predictions_table(
                         model=model,
                         points=points,
@@ -222,7 +218,7 @@ def train_loop(cfg: TrainConfig):
                 "val_seq_acc": val_seq_acc,
                 "learning_rate": scheduler.get_last_lr()[0],
                 "epoch": epoch,
-                "Predictions": val_table,
+                **({"Predictions": val_table} if val_table is not None else {}),
             }
         )
 
