@@ -3,10 +3,16 @@ import torch
 from plot2eq.inference.fit_constants import fit_constants
 
 
-def predict_best_equation(
-    model, points_tensor, tokenizer, beam_size=5, length_penalty=0.01
+def predict_top_k_equations(
+    model,
+    points_tensor,
+    tokenizer,
+    x_data,
+    y_data,
+    beam_size=5,
+    top_k=1,
+    length_penalty=0.01,
 ):
-
     model.eval()
 
     pad_idx = tokenizer.token_map["<pad>"]
@@ -16,11 +22,7 @@ def predict_best_equation(
     candidates = model.beam_search(points_tensor, sos_idx, eos_idx, beam_size=beam_size)
     candidates = candidates[0]
 
-    best_expr = None
-    best_score = float("inf")
-    best_mse = float("inf")
-    best_params = None
-
+    results = []
     seen_exprs = set()
 
     for i in range(beam_size):
@@ -37,25 +39,26 @@ def predict_best_equation(
 
             seen_exprs.add(expr_str)
 
-            final_expr, popt, mse = fit_constants(points_tensor, expr)
+            final_expr, popt, mse = fit_constants(expr, x_data, y_data)
 
             if mse == float("inf"):
                 continue
 
             score = mse + length_penalty * seq_length
 
-            if score < best_score:
-                best_score = score
-                best_expr = final_expr
-                best_mse = mse
-                best_params = popt
+            results.append(
+                {
+                    "skeleton": str(expr),
+                    "best_expr": final_expr,
+                    "score": score,
+                    "mse": mse,
+                    "params": popt,
+                }
+            )
 
         except Exception:
             continue
 
-    return {
-        "best_expr": best_expr,
-        "score": best_score,
-        "mse": best_mse,
-        "params": best_params,
-    }
+    results.sort(key=lambda x: x["score"])
+
+    return results[:top_k]
