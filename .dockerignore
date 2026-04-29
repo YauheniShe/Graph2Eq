@@ -6,5 +6,5 @@ src/plot2eq.egg-info/
 __pycache__/
 *.pyc
 
-checkpoints/v1/
-checkpoints/v2/last_model.pth
+checkpoints/
+!checkpoints/v2/best_model.pth
