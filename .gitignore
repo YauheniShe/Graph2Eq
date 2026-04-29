@@ -1,10 +1,10 @@
 .vscode
 .idea
 __pycache__
-data
 test.py
 plot2eq.egg-info
 venv
 plot2eq_dataset.tar.gz
 .gradio
 checkpoints
+data
