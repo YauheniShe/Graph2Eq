@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sympy.parsing.latex import parse_latex
 from sympy.parsing.sympy_parser import (
     implicit_multiplication_application,
@@ -63,6 +63,8 @@ class PredictRequest(BaseModel):
     formula: str = None  # type: ignore
     beam_size: int = 5
     top_k: int = 3
+    beam_size: int = Field(default=5, ge=1, le=15, description="Beam size for search")
+    top_k: int = Field(default=3, ge=1, le=5, description="Top K results to return")
 
 
 class FormulaRequest(BaseModel):
