@@ -345,6 +345,11 @@
                 const response = await fetch('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await response.json();
 
+                if (!response.ok && data.detail) {
+                    resultsDiv.innerHTML = `<div class="bg-red-50 p-4 border border-red-200 text-red-600 rounded-lg"><b>Ошибка валидации:</b> Недопустимые значения параметров. Антон хватит ломать бекенд! 😡👊</div>`;
+                    return;
+                }
+
                 if (data.error) {
                     resultsDiv.innerHTML = `<div class="bg-red-50 p-4 border border-red-200 text-red-600 rounded-lg"><b>Ошибка:</b> ${data.error}</div>`;
                     return;
