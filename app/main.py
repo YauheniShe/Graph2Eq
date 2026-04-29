@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from PIL import Image
 from pydantic import BaseModel
+from sympy.parsing.latex import parse_latex
 from sympy.parsing.sympy_parser import (
     implicit_multiplication_application,
     parse_expr,
@@ -42,7 +43,7 @@ async def lifespan(app: FastAPI):
         max_seq_len=config.max_seq_len,
         dropout=config.dropout,
     )
-    checkpoint_path = "/home/yauheni/pet_project/Plot2Eq/checkpoints/v2/best_model.pth"
+    checkpoint_path = "../checkpoints/v2/best_model.pth"
     if os.path.exists(checkpoint_path):
         state_dict = torch.load(checkpoint_path, map_location="cpu")
         model.load_state_dict(state_dict.get("model_state_dict", state_dict))
@@ -59,7 +60,7 @@ class PredictRequest(BaseModel):
     mode: str
     image_base64: str = None  # type: ignore
     formula: str = None  # type: ignore
-    beam_size: int = 7
+    beam_size: int = 5
     top_k: int = 3
 
 
@@ -99,8 +100,6 @@ def get_ideal_math(formula_str, num_points=256):
     try:
         x_sym = sp.Symbol("x", real=True)
         if "\\" in formula_str:
-            from sympy.parsing.latex import parse_latex
-
             expr = parse_latex(formula_str)
         else:
             formula_str = (
