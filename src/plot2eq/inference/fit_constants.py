@@ -74,7 +74,7 @@ def fit_constants_fast(expr, x_data, y_data):
             (x_sym, *params), parameterized_expr, modules="numpy"
         )
 
-        initial_guesses = np.ones(len(params))
+        initial_guesses = np.random.rand(len(params))
         bounds = ([-10.0] * len(params), [10.0] * len(params))
 
         with warnings.catch_warnings():
